@@ -1,5 +1,7 @@
 <?php
-    use TYPO3\CMS\Core\Utility\GeneralUtility;
+
+use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class user_dmailsubscribe
 {
@@ -109,28 +111,44 @@ class user_dmailsubscribe
         $pid = $this->cObj->stdWrap($conf['pid'], $conf['pid.']);
 
         if (($addressUid = \TYPO3\CMS\Core\Utility\GeneralUtility::_GP('rU'))) {
-            $res = $this->getDatabaseConnection()->exec_SELECTquery(
-                '*',
-                'sys_dmail_ttaddress_category_mm',
-                'uid_local='.intval($addressUid)
-            );
+            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+                ->getQueryBuilderForTable('sys_dmail_ttaddress_category_mm');
+            $res = $queryBuilder->select('*')
+                ->from('sys_dmail_ttaddress_category_mm')
+                ->where(
+                    $queryBuilder->expr()->eq('uid_local', (int)$addressUid)
+                )
+                ->execute()
+                ->fetchAll();
 
             $subscribedTo = array();
-            while (($row = $this->getDatabaseConnection()->sql_fetch_assoc($res))) {
+            foreach ($res as $row) {
                 $subscribedTo[] = $row['uid_foreign'];
             }
             $subscribedToList = implode(',', $subscribedTo);
         }
 
-        $res = $this->getDatabaseConnection()->exec_SELECTquery(
-            '*',
-            'sys_dmail_category',
-            'l18n_parent=0 AND pid='.intval($pid).
-            $this->cObj->enableFields('sys_dmail_category')
-        );
+//        $res = $this->getDatabaseConnection()->exec_SELECTquery(
+//            '*',
+//            'sys_dmail_category',
+//            'l18n_parent=0 AND pid='.intval($pid).
+//            $this->cObj->enableFields('sys_dmail_category')
+//        );
+
+        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+            ->getQueryBuilderForTable('sys_dmail_category');
+
+        $res = $queryBuilder->select('*')
+            ->from('sys_dmail_category')
+            ->where(
+                $queryBuilder->expr()->eq('l18n_parent', (int)0),
+                $queryBuilder->expr()->eq('pid', (int)$pid)
+            )
+            ->execute()
+            ->fetchAll();
 
         $i = 1;
-        while (($row = $this->getDatabaseConnection()->sql_fetch_assoc($res))) {
+        foreach ($res as $row) {
             $checked = GeneralUtility::inList($subscribedToList, $row['uid']);
 
             $theRow = $GLOBALS['TSFE']->sys_page->getRecordOverlay(

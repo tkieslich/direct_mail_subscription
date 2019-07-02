@@ -1,7 +1,7 @@
 plugin.feadmin.dmailsubscription >
 plugin.feadmin.dmailsubscription = USER_INT
 plugin.feadmin.dmailsubscription {
-	userFunc = user_feAdmin->init
+	userFunc = DirectMailTeam\DirectMailSubscription\user_feAdmin->init
 #	includeLibs = EXT:direct_mail_subscription/fe_adminLib.inc
 
 	templateFile ={$plugin.feadmin.dmailsubscription.file.templateFile}
