@@ -22,7 +22,7 @@
     "issues": "https://forge.typo3.org/projects/extension-direct_mail_subscription"
   },
   "require": {
-    "typo3/cms-core": ">=6.2,<8.0"
+    "typo3/cms-core": ">=8.5,<9.5.99"
   },
   "autoload": {
     "psr-4": {
