@@ -28,7 +28,10 @@ namespace DirectMailTeam\DirectMailSubscription;
 *  This copyright notice MUST APPEAR in all copies of the script!
 ***************************************************************/
 
+use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Service\MarkerBasedTemplateService;
+use TYPO3\CMS\Core\TimeTracker\TimeTracker;
 use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Core\Utility\DebugUtility;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
@@ -185,9 +188,9 @@ class user_feAdmin
             // link configuration
         $linkConf = is_array($this->conf['formurl.']) ? $this->conf['formurl.'] : array();
             // pid
-        $this->thePid = intval($this->conf['pid']) ? intval($this->conf['pid']) : $GLOBALS['TSFE']->id;
+        $this->thePid = (int)$this->conf['pid'] ? (int)$this->conf['pid'] : $GLOBALS['TSFE']->id;
             //
-        $this->codeLength = intval($this->conf['authcodeFields.']['codeLength']) ? intval($this->conf['authcodeFields.']['codeLength']) : 8;
+        $this->codeLength = (int)$this->conf['authcodeFields.']['codeLength'] ? (int)$this->conf['authcodeFields.']['codeLength'] : 8;
 
             // Setting the hardcoded lists of fields allowed for editing and creation.
         $this->fieldList = implode(',', GeneralUtility::trimExplode(',', $GLOBALS['TCA'][$this->theTable]['feInterface']['fe_admin_fieldList'], 1));
@@ -344,7 +347,7 @@ class user_feAdmin
             $templateCode = $this->templateService->getSubpart($this->templateCode, '###TEMPLATE_'.$key.'_SAVED###');
             $this->setCObjects($templateCode, $this->currentArr);
             $markerArray = $this->templateService->fillInMarkerArray($this->markerArray, $this->currentArr, '', true, 'FIELD_', $this->recInMarkersHSC);
-            $content = $this->cObj->substituteMarkerArray($templateCode, $markerArray);
+            $content = $this->templateService->substituteMarkerArray($templateCode, $markerArray);
 
                 // email message:
             $this->compileMail(
@@ -357,7 +360,7 @@ class user_feAdmin
             // If there was an error, we return the template-subpart with the error message
             $templateCode = $this->templateService->getSubpart($this->templateCode, $this->error);
             $this->setCObjects($templateCode);
-            $content = $this->cObj->substituteMarkerArray($templateCode, $this->markerArray);
+            $content = $this->templateService->substituteMarkerArray($templateCode, $this->markerArray);
         } else {
             // Finally, if there has been no attempt to save. That is either preview or just displaying and empty or not correctly filled form:
             if (!$this->cmd) {
@@ -874,7 +877,21 @@ class user_feAdmin
                     $newFieldList = implode(',', array_intersect(explode(',', $this->fieldList), GeneralUtility::trimExplode(',', $this->conf['edit.']['fields'], 1)));
                     if ($this->aCAuth($origArr) || $this->cObj->DBmayFEUserEdit($this->theTable, $origArr, $GLOBALS['TSFE']->fe_user->user, $this->conf['allowedGroups'], $this->conf['fe_userEditSelf'])) {
 
-                        $this->cObj->DBgetUpdate($this->theTable, $theUid, $this->dataArr, $newFieldList, true);
+//                        $this->cObj->DBgetUpdate($this->theTable, $theUid, $this->dataArr, $newFieldList, true);
+
+                        /** @var QueryBuilder $queryBuilder */
+                        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+                            ->getQueryBuilderForTable($this->theTable);
+
+                        $queryBuilder
+                            ->update($this->theTable)
+                            ->where(
+                                $queryBuilder->expr()->eq('uid', (int)$theUid)
+                            )
+                            ->set('deleted', 1)
+                            ->execute();
+
+
                         $this->currentArr = $GLOBALS['TSFE']->sys_page->getRawRecord($this->theTable, $theUid);
                         $this->userProcess_alt($this->conf['edit.']['userFunc_afterSave'], $this->conf['edit.']['userFunc_afterSave.'], array('rec' => $this->currentArr, 'origRec' => $origArr));
                         $this->saved = 1;
@@ -886,8 +903,18 @@ class user_feAdmin
             default:
                 if ($this->conf['create']) {
                     $newFieldList = implode(',', array_intersect(explode(',', $this->fieldList), GeneralUtility::trimExplode(',', $this->conf['create.']['fields'], 1)));
-                    $this->cObj->DBgetInsert($this->theTable, $this->thePid, $this->dataArr, $newFieldList, true);
-                    $newId = $GLOBALS['TYPO3_DB']->sql_insert_id();
+
+                    /** @var \TYPO3\CMS\Core\Database\ConnectionPool $connection */
+                    $connection = GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable(
+                        $this->theTable
+                    );
+
+                    $connection->createQueryBuilder()
+                        ->insert($this->theTable)
+                        ->values($this->dataArr)
+                        ->execute();
+
+                    $newId = $connection->lastInsertId();
 
                     if ($this->theTable == 'fe_users' && $this->conf['fe_userOwnSelf']) {
                         // enables users, creating logins, to own them self.
@@ -901,7 +928,7 @@ class user_feAdmin
                         if ($GLOBALS['TCA'][$this->theTable]['ctrl']['fe_crgroup_id']) {
                             $field = $GLOBALS['TCA'][$this->theTable]['ctrl']['fe_crgroup_id'];
                             list($dataArr[$field]) = explode(',', $this->dataArr['usergroup']);
-                            $dataArr[$field] = intval($dataArr[$field]);
+                            $dataArr[$field] = (int)$dataArr[$field];
                             $extraList .= ','.$field;
                         }
                         if (count($dataArr)) {
@@ -945,7 +972,19 @@ class user_feAdmin
                             // If the record is fully deleted... then remove the image (or any file) attached.
                             $this->deleteFilesFromRecord($this->recUid);
                         }
-                        $this->cObj->DBgetDelete($this->theTable, $this->recUid, true);
+
+                        /** @var QueryBuilder $queryBuilder */
+                        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+                            ->getQueryBuilderForTable($this->theTable);
+
+                        $queryBuilder
+                            ->update($this->theTable)
+                            ->where(
+                                $queryBuilder->expr()->eq('uid', (int)$this->recUid)
+                            )
+                            ->set('deleted', 1)
+                            ->execute();
+
                         $this->currentArr = $origArr;
                         $this->saved = 1;
                     } else {
@@ -1184,7 +1223,7 @@ class user_feAdmin
         $failure = GeneralUtility::_GP('noWarnings') ? '' : $this->failure;
 
         if (!$failure) {
-            $templateCode = $this->cObj->substituteSubpart($templateCode, '###SUB_REQUIRED_FIELDS_WARNING###', '');
+            $templateCode = $this->templateService->substituteSubpart($templateCode, '###SUB_REQUIRED_FIELDS_WARNING###', '');
         }
 
         $templateCode = $this->removeRequired($templateCode, $failure);
@@ -1472,10 +1511,10 @@ class user_feAdmin
             if (!empty($errorMsg)) {
                 $markerArrayCaptcha['###EVAL_ERROR_FIELD_captcha###'] = $errorMsg;
             } else {
-                $templateCodeCaptcha = $this->cObj->substituteSubpart($templateCodeCaptcha, '###SUB_REQUIRED_FIELD_captcha###', '');
+                $templateCodeCaptcha = $this->templateService->substituteSubpart($templateCodeCaptcha, '###SUB_REQUIRED_FIELD_captcha###', '');
             }
 
-            $captcha = $this->cObj->substituteMarkerArray($templateCodeCaptcha, $markerArrayCaptcha);
+            $captcha = $this->templateService->substituteMarkerArray($templateCodeCaptcha, $markerArrayCaptcha);
         } else {
             $captcha = '';
         }
@@ -1897,7 +1936,7 @@ class user_feAdmin
      */
     protected function getTimeTracker()
     {
-        return $GLOBALS['TT'];
+        return GeneralUtility::makeInstance(TimeTracker::class);
     }
 }
 
