@@ -1,5 +1,7 @@
 <?php
 
+namespace DirectMailTeam\DirectMailSubscription;
+
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
@@ -127,13 +129,6 @@ class user_dmailsubscribe
             }
             $subscribedToList = implode(',', $subscribedTo);
         }
-
-//        $res = $this->getDatabaseConnection()->exec_SELECTquery(
-//            '*',
-//            'sys_dmail_category',
-//            'l18n_parent=0 AND pid='.intval($pid).
-//            $this->cObj->enableFields('sys_dmail_category')
-//        );
 
         $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getQueryBuilderForTable('sys_dmail_category');
