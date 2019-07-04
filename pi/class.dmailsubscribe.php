@@ -1,7 +1,5 @@
 <?php
 
-namespace DirectMailTeam\DirectMailSubscription;
-
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
