@@ -982,7 +982,7 @@ class user_feAdmin
                             ->where(
                                 $queryBuilder->expr()->eq('uid', (int)$this->recUid)
                             )
-                            ->set('deleted', 1)
+                            ->set('hidden', 1)
                             ->execute();
 
                         $this->currentArr = $origArr;
